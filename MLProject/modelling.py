@@ -5,13 +5,26 @@ import mlflow.sklearn
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score
+import os
 
 def run(data_path):
+    # Validasi file ada
+    if not os.path.exists(data_path):
+        raise FileNotFoundError(f"Data file not found: {data_path}")
+    
     mlflow.start_run()
 
-    df = pd.read_csv(data_path)
+    try:
+        df = pd.read_csv(data_path)
+    except Exception as e:
+        mlflow.end_run()
+        raise ValueError(f"Error reading CSV file: {e}")
 
     # Pastikan kolom target benar
+    if 'y' not in df.columns:
+        mlflow.end_run()
+        raise ValueError("Target column 'y' not found in dataset")
+    
     y = df['y']
     X = df.drop(columns=['y'])
 
@@ -32,7 +45,7 @@ def run(data_path):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--data_path", type=str)
+    parser.add_argument("--data_path", type=str, default="train_preprocessing.csv")
     args = parser.parse_args()
 
     run(args.data_path)
