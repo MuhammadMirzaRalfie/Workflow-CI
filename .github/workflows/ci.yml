@@ -19,15 +19,30 @@ jobs:
       uses: conda-incubator/setup-miniconda@v3
       with:
         environment-file: MLProject/conda.yaml
+        environment-name: mlflow-ci-env
         auto-activate-base: false
+        activate-environment: true
 
     # 3️⃣ Debug environment (opsional)
     - name: Debug Conda Environment
       run: |
+        echo "=== conda info ==="
         conda info
-        conda list
-        which python
-        conda run -n mlflow-ci-env which mlflow
+        echo "=== conda envs ==="
+        conda env list || conda info --envs
+        echo "=== which python ==="
+        which python || true
+        echo "=== which mlflow in env (conda run) ==="
+        conda run -n mlflow-ci-env which mlflow || true
+
+    - name: Ensure conda env exists (fallback)
+      run: |
+        if ! conda env list | grep -q "mlflow-ci-env"; then
+          echo "Conda env 'mlflow-ci-env' not found — creating from MLProject/conda.yaml"
+          conda env create -f MLProject/conda.yaml
+        else
+          echo "Conda env 'mlflow-ci-env' already exists"
+        fi
 
     # 4️⃣ Run MLflow Project di environment yang tepat
     - name: Run MLflow Project
