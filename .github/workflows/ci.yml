@@ -10,21 +10,31 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout
+    # 1️⃣ Checkout repo
+    - name: Checkout repository
       uses: actions/checkout@v4
-    
+
+    # 2️⃣ Setup Miniconda
     - name: Setup Miniconda
       uses: conda-incubator/setup-miniconda@v3
       with:
-        activate-environment: mlflow-ci-env
         environment-file: MLProject/conda.yaml
         auto-activate-base: false
-    
+
+    # 3️⃣ Debug environment (opsional)
+    - name: Debug Conda Environment
+      run: |
+        conda info
+        conda list
+        which python
+        conda run -n mlflow-ci-env which mlflow
+
+    # 4️⃣ Run MLflow Project di environment yang tepat
     - name: Run MLflow Project
       run: |
-        cd MLProject
-        mlflow run .
+        conda run -n mlflow-ci-env mlflow run MLProject
 
+    # 5️⃣ Upload MLflow artifacts
     - name: Upload Model Artifact
       uses: actions/upload-artifact@v4
       with:
@@ -42,10 +52,9 @@ jobs:
 
     - name: Build Docker Image using MLflow
       run: |
-        cd MLProject
-        mlflow models build-docker -m mlruns/0/*/artifacts/model -n mirza-mlflow-ci:latest
+        conda run -n mlflow-ci-env mlflow models build-docker -m MLProject/mlruns/0/*/artifacts/model -n mirza-mlflow-ci:latest
         docker tag mirza-mlflow-ci:latest ${{ secrets.DOCKERHUB_USERNAME }}/mirza-mlflow-ci:latest
 
-    - name: Push to Docker Hub
+    - name: Push Docker Image
       run: |
         docker push ${{ secrets.DOCKERHUB_USERNAME }}/mirza-mlflow-ci:latest
