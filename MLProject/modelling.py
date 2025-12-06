@@ -12,36 +12,31 @@ def run(data_path):
     if not os.path.exists(data_path):
         raise FileNotFoundError(f"Data file not found: {data_path}")
     
-    mlflow.start_run()
+    with mlflow.start_run():
+        try:
+            df = pd.read_csv(data_path)
+        except Exception as e:
+            raise ValueError(f"Error reading CSV file: {e}")
 
-    try:
-        df = pd.read_csv(data_path)
-    except Exception as e:
-        mlflow.end_run()
-        raise ValueError(f"Error reading CSV file: {e}")
+        # Pastikan kolom target benar
+        if 'y' not in df.columns:
+            raise ValueError("Target column 'y' not found in dataset")
 
-    # Pastikan kolom target benar
-    if 'y' not in df.columns:
-        mlflow.end_run()
-        raise ValueError("Target column 'y' not found in dataset")
-    
-    y = df['y']
-    X = df.drop(columns=['y'])
+        y = df['y']
+        X = df.drop(columns=['y'])
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42
-    )
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=0.2, random_state=42
+        )
 
-    model = RandomForestClassifier(n_estimators=150, random_state=42)
-    model.fit(X_train, y_train)
+        model = RandomForestClassifier(n_estimators=150, random_state=42)
+        model.fit(X_train, y_train)
 
-    preds = model.predict(X_test)
-    acc = accuracy_score(y_test, preds)
+        preds = model.predict(X_test)
+        acc = accuracy_score(y_test, preds)
 
-    mlflow.log_metric("accuracy", acc)
-    mlflow.sklearn.log_model(model, "model")
-
-    mlflow.end_run()
+        mlflow.log_metric("accuracy", acc)
+        mlflow.sklearn.log_model(model, "model")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

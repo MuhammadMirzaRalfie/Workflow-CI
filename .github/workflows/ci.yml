@@ -34,6 +34,17 @@ jobs:
       run: |
         conda run -n mlflow-ci-env mlflow run MLProject
 
+    # 5️⃣ Determine latest model artifact
+    - name: Locate latest model artifact
+      run: |
+        MODEL_DIR=$(ls -td MLProject/mlruns/*/*/artifacts/model 2>/dev/null | head -n 1 || true)
+        if [ -z "$MODEL_DIR" ]; then
+          echo "Model artifact not found at MLProject/mlruns/*/*/artifacts/model"
+          echo "Contents of MLProject:"; ls -la MLProject || true
+          exit 1
+        fi
+        echo "MODEL_DIR=$MODEL_DIR" >> $GITHUB_ENV
+
     # 5️⃣ Upload MLflow artifacts
     - name: Upload Model Artifact
       uses: actions/upload-artifact@v4
@@ -52,7 +63,12 @@ jobs:
 
     - name: Build Docker Image using MLflow
       run: |
-        conda run -n mlflow-ci-env mlflow models build-docker -m MLProject/mlruns/0/*/artifacts/model -n mirza-mlflow-ci:latest
+        if [ -z "$MODEL_DIR" ]; then
+          echo "MODEL_DIR is not set. Ensure the 'Locate latest model artifact' step ran and succeeded."
+          exit 1
+        fi
+        echo "Using model artifact: $MODEL_DIR"
+        conda run -n mlflow-ci-env mlflow models build-docker -m "$MODEL_DIR" -n mirza-mlflow-ci:latest
         docker tag mirza-mlflow-ci:latest ${{ secrets.DOCKERHUB_USERNAME }}/mirza-mlflow-ci:latest
 
     - name: Push Docker Image
