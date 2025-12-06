@@ -52,13 +52,14 @@ jobs:
         echo "Cleaning MLProject/mlruns/* to avoid stale run references"
         rm -rf MLProject/mlruns/* || true
 
-    - name: Run MLflow Project
+    - name: Run MLflow Project (no-conda, inside created env)
       run: |
         export MLFLOW_TRACKING_URI="file://$PWD/MLProject/mlruns"
         echo "MLFLOW_TRACKING_URI=$MLFLOW_TRACKING_URI"
         set -o pipefail
-        # Capture full output to mlflow_run.log and preserve exit code
-        conda run -n mlflow-ci-env mlflow run MLProject 2>&1 | tee mlflow_run.log
+        # Run mlflow run without creating a new conda env (--no-conda) inside the named env
+        # Use bash -lc so the exported MLFLOW_TRACKING_URI is visible inside the conda-run shell
+        conda run -n mlflow-ci-env bash -lc "export MLFLOW_TRACKING_URI='$MLFLOW_TRACKING_URI' && mlflow run MLProject --no-conda" 2>&1 | tee mlflow_run.log
         EXIT_CODE=${PIPESTATUS[0]:-0}
         echo "MLFLOW_RUN_EXIT_CODE=$EXIT_CODE"
         if [ "$EXIT_CODE" -ne 0 ]; then
