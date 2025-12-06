@@ -52,18 +52,17 @@ jobs:
         echo "Cleaning MLProject/mlruns/* to avoid stale run references"
         rm -rf MLProject/mlruns/* || true
 
-    - name: Run MLflow Project (no-conda, inside created env)
+    - name: Run modelling script inside created env
       run: |
-        export MLFLOW_TRACKING_URI="file://$PWD/MLProject/mlruns"
-        echo "MLFLOW_TRACKING_URI=$MLFLOW_TRACKING_URI"
         set -o pipefail
-        # Run mlflow run without creating a new conda env (--no-conda) inside the named env
-        # Use bash -lc so the exported MLFLOW_TRACKING_URI is visible inside the conda-run shell
-        conda run -n mlflow-ci-env bash -lc "export MLFLOW_TRACKING_URI='$MLFLOW_TRACKING_URI' && mlflow run MLProject --no-conda" 2>&1 | tee mlflow_run.log
+        # Run the modelling script directly inside the created conda env.
+        # Change to MLProject so relative paths inside the project work as expected,
+        # and set a local filesystem tracking URI pointing to MLProject/mlruns.
+        conda run -n mlflow-ci-env bash -lc "cd MLProject && export MLFLOW_TRACKING_URI=\"file://$PWD/mlruns\" && echo \"MLFLOW_TRACKING_URI=$MLFLOW_TRACKING_URI\" && python modelling.py --data_path train_preprocessing.csv" 2>&1 | tee mlflow_run.log
         EXIT_CODE=${PIPESTATUS[0]:-0}
         echo "MLFLOW_RUN_EXIT_CODE=$EXIT_CODE"
         if [ "$EXIT_CODE" -ne 0 ]; then
-          echo "mlflow run failed (exit $EXIT_CODE). Printing log:"
+          echo "modelling.py run failed (exit $EXIT_CODE). Printing log:"
           sed -n '1,200p' mlflow_run.log || true
           exit $EXIT_CODE
         fi
