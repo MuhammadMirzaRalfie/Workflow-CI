@@ -56,7 +56,24 @@ jobs:
       run: |
         export MLFLOW_TRACKING_URI="file://$PWD/MLProject/mlruns"
         echo "MLFLOW_TRACKING_URI=$MLFLOW_TRACKING_URI"
-        conda run -n mlflow-ci-env mlflow run MLProject
+        set -o pipefail
+        # Capture full output to mlflow_run.log and preserve exit code
+        conda run -n mlflow-ci-env mlflow run MLProject 2>&1 | tee mlflow_run.log
+        EXIT_CODE=${PIPESTATUS[0]:-0}
+        echo "MLFLOW_RUN_EXIT_CODE=$EXIT_CODE"
+        if [ "$EXIT_CODE" -ne 0 ]; then
+          echo "mlflow run failed (exit $EXIT_CODE). Printing log:"
+          sed -n '1,200p' mlflow_run.log || true
+          exit $EXIT_CODE
+        fi
+
+    - name: Upload mlflow run log and mlruns (debug)
+      uses: actions/upload-artifact@v4
+      with:
+        name: mlflow-run-debug
+        path: |
+          mlflow_run.log
+          MLProject/mlruns
 
     # 5️⃣ Determine latest model artifact
     - name: Locate latest model artifact
