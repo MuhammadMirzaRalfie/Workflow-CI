@@ -76,14 +76,35 @@ jobs:
           MLProject/mlruns
 
     # 5️⃣ Determine latest model artifact
-    - name: Locate latest model artifact
+    - name: Locate latest model artifact (flexible)
       run: |
+        set -euo pipefail
+        # 1) Prefer artifact named 'model'
         MODEL_DIR=$(ls -td MLProject/mlruns/*/*/artifacts/model 2>/dev/null | head -n 1 || true)
         if [ -z "$MODEL_DIR" ]; then
-          echo "Model artifact not found at MLProject/mlruns/*/*/artifacts/model"
-          echo "Contents of MLProject:"; ls -la MLProject || true
+          echo "No 'model' artifact folder found. Searching any artifacts..."
+          MODEL_DIR=$(ls -td MLProject/mlruns/*/*/artifacts/* 2>/dev/null | head -n 1 || true)
+        fi
+
+        # 2) If still empty, try to parse mlflow_run.log for a local file:// artifact URI
+        if [ -z "$MODEL_DIR" ] && [ -f mlflow_run.log ]; then
+          echo "Attempting to parse mlflow_run.log for artifact URI..."
+          # Look for first file://... occurrence
+          ART_URI=$(grep -oE 'file://[^) ]+' mlflow_run.log | head -n1 || true)
+          if [ -n "$ART_URI" ]; then
+            # convert file:// URI to path
+            MODEL_DIR=${ART_URI#file://}
+          fi
+        fi
+
+        if [ -z "$MODEL_DIR" ]; then
+          echo "Model artifact not found. Contents of MLProject:/mlruns:";
+          find MLProject/mlruns -maxdepth 3 -mindepth 1 -type d -print || true
+          echo "mlflow_run.log (tail):"; tail -n 200 mlflow_run.log || true
           exit 1
         fi
+
+        echo "Using MODEL_DIR: $MODEL_DIR"
         echo "MODEL_DIR=$MODEL_DIR" >> $GITHUB_ENV
 
     # 5️⃣ Upload MLflow artifacts
