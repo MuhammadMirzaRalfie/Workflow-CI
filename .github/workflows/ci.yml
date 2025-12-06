@@ -19,7 +19,6 @@ jobs:
       uses: conda-incubator/setup-miniconda@v3
       with:
         environment-file: MLProject/conda.yaml
-        environment-name: mlflow-ci-env
         auto-activate-base: false
         activate-environment: true
 
@@ -39,14 +38,24 @@ jobs:
       run: |
         if ! conda env list | grep -q "mlflow-ci-env"; then
           echo "Conda env 'mlflow-ci-env' not found — creating from MLProject/conda.yaml"
-          conda env create -f MLProject/conda.yaml
+          conda env create -f MLProject/conda.yaml -n mlflow-ci-env
         else
           echo "Conda env 'mlflow-ci-env' already exists"
         fi
 
-    # 4️⃣ Run MLflow Project di environment yang tepat
+    # 4️⃣ Clean previous runs and Run MLflow Project in the correct environment
+    - name: Clean previous MLflow runs
+      run: |
+        if [ ! -d MLProject ]; then
+          echo "MLProject directory not found"; ls -la || true; exit 1
+        fi
+        echo "Cleaning MLProject/mlruns/* to avoid stale run references"
+        rm -rf MLProject/mlruns/* || true
+
     - name: Run MLflow Project
       run: |
+        export MLFLOW_TRACKING_URI="file://$PWD/MLProject/mlruns"
+        echo "MLFLOW_TRACKING_URI=$MLFLOW_TRACKING_URI"
         conda run -n mlflow-ci-env mlflow run MLProject
 
     # 5️⃣ Determine latest model artifact
