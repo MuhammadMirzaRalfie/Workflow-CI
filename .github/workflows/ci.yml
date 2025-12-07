@@ -28,7 +28,7 @@ jobs:
         run: |
           echo $CSV_URL
           echo "Checking if dataset exists..."
-          ls -la MLProject/preprocessing/processed_dataset.csv || echo "Dataset not found!"
+          ls -la MLProject/train_preprocessing.csv || echo "Dataset not found!"
 
       - name: Install dependencies
         run: |
@@ -50,7 +50,7 @@ jobs:
         run: |
           cd MLProject
           export MLFLOW_ARTIFACT_ROOT=./mlruns
-          mlflow run . --env-manager=local -P data_path="preprocessing/processed_dataset.csv" -P target_var="PlacementStatus"
+          mlflow run . --env-manager=local -P data_path="train_preprocessing.csv" -P target_var="y"
 
       - name: Get latest MLflow run_id
         run: |
@@ -87,18 +87,18 @@ jobs:
         if: false  
         uses: docker/login-action@v2
         with:
-          username: ${{ secrets.DOCKER_HUB_USERNAME }}
-          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Tag Docker Image (Optional)
         if: false  
         run: |
-          docker tag cc ${{ secrets.DOCKER_HUB_USERNAME }}/cc:latest
+          docker tag cc ${{ secrets.DOCKERHUB_USERNAME }}/cc:latest
 
       - name: Push Docker Image (Optional)
         if: false  
         run: |
-          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/cc:latest
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/cc:latest
       
       - name: Training Summary
         run: |

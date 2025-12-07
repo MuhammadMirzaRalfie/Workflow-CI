@@ -1,4 +1,4 @@
-name: Placement_Prediction_Project
+name: Bank_term_Deposit_Classification_Project
 
 conda_env: conda.yaml
 
