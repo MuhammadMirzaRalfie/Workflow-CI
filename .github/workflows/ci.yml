@@ -80,7 +80,14 @@ jobs:
 
       - name: Build Docker Model
         run: |
-          mlflow models build-docker --model-uri "file://$MODEL_PATH" --name "cc" --install-java=False
+          mlflow models generate-dockerfile --model-uri "file://$MODEL_PATH" -d docker_build_ctx
+          
+          # Remove Java dependencies from Dockerfile to avoid build errors
+          sed -i 's/openjdk-8-jdk//g' docker_build_ctx/Dockerfile
+          sed -i 's/maven//g' docker_build_ctx/Dockerfile
+          
+          echo "Building Docker image..."
+          docker build -t cc docker_build_ctx
 
       - name: Log in to Docker Hub (Optional)
         uses: docker/login-action@v2
