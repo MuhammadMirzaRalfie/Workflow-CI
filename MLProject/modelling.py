@@ -12,9 +12,7 @@ import os
 import sys
 from pathlib import Path
 
-# ==============================================
-# 0. PARSE ARGUMENTS
-# ==============================================
+
 data_path = sys.argv[1] if len(sys.argv) > 1 else "train_preprocessing.csv"
 target_var = sys.argv[2] if len(sys.argv) > 2 else "y"
 
@@ -45,9 +43,6 @@ X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42
 )
 
-# No scaling: use raw features
-
-# No resampling: use the train/test split directly
 print("No resampling and no scaling: using train/test split as-is")
 X_train_res, y_train_res = X_train, y_train
 print(f"Training set shape: {X_train_res.shape}")
@@ -136,10 +131,7 @@ with mlflow.start_run():
         traceback.print_exc()
         raise
 
-    print("\n" + "="*50)
-    print("TRAINING COMPLETED SUCCESSFULLY!")
-    print("="*50)
     print(f"Final Accuracy: {acc:.4f}")
     print(f"Model saved to: {mlflow.get_artifact_uri()}")
-    print("="*50)
+
 
