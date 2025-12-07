@@ -14,102 +14,62 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    # 2️⃣ Setup Miniconda
-    - name: Setup Miniconda
-      uses: conda-incubator/setup-miniconda@v3
+    # 2️⃣ Setup Python and run MLflow project (simpler, pip-based)
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v4
       with:
-        environment-file: MLProject/conda.yaml
-        auto-activate-base: false
-        activate-environment: true
+        python-version: "3.10"
 
-    # 3️⃣ Debug environment (opsional)
-    - name: Debug Conda Environment
+    - name: Check dataset and repo layout
       run: |
-        echo "=== conda info ==="
-        conda info
-        echo "=== conda envs ==="
-        conda env list || conda info --envs
-        echo "=== which python ==="
-        which python || true
-        echo "=== which mlflow in env (conda run) ==="
-        conda run -n mlflow-ci-env which mlflow || true
+        echo "Listing MLProject contents"
+        ls -la MLProject || true
+        echo "Checking dataset presence"
+        ls -la MLProject/train_preprocessing.csv || echo "Dataset not found!"
 
-    - name: Ensure conda env exists (fallback)
+    - name: Install dependencies
       run: |
-        if ! conda env list | grep -q "mlflow-ci-env"; then
-          echo "Conda env 'mlflow-ci-env' not found — creating from MLProject/conda.yaml"
-          conda env create -f MLProject/conda.yaml -n mlflow-ci-env
+        python -m pip install --upgrade pip
+        if [ -f MLProject/requirements.txt ]; then
+          pip install -r MLProject/requirements.txt
         else
-          echo "Conda env 'mlflow-ci-env' already exists"
+          pip install mlflow scikit-learn pandas numpy joblib
         fi
 
-    # 4️⃣ Clean previous runs and Run MLflow Project in the correct environment
-    - name: Clean previous MLflow runs
+    - name: Setup MLflow environment (clean mlruns)
       run: |
-        if [ ! -d MLProject ]; then
-          echo "MLProject directory not found"; ls -la || true; exit 1
-        fi
-        echo "Cleaning MLProject/mlruns/* to avoid stale run references"
-        rm -rf MLProject/mlruns/* || true
+        cd MLProject
+        rm -rf mlruns .mlruns mlartifacts || true
+        mkdir -p mlruns
+        echo "Cleaned/created mlruns"
 
-    - name: Run modelling script inside created env
-      working-directory: MLProject
-      env:
-        MLFLOW_TRACKING_URI: "file://${{ github.workspace }}/MLProject/mlruns"
+    - name: Run mlflow project (local env-manager)
       run: |
-        set -o pipefail
-        mkdir -p "$MLFLOW_TRACKING_URI" || true
-        # Run modelling.py inside the created conda env; step-level env ensures MLFLOW_TRACKING_URI is visible
-        conda run -n mlflow-ci-env python modelling.py --data_path train_preprocessing.csv 2>&1 | tee ../mlflow_run.log
-        EXIT_CODE=${PIPESTATUS[0]:-0}
-        echo "MLFLOW_RUN_EXIT_CODE=$EXIT_CODE"
-        if [ "$EXIT_CODE" -ne 0 ]; then
-          echo "modelling.py run failed (exit $EXIT_CODE). Printing log:"
-          sed -n '1,200p' ../mlflow_run.log || true
-          exit $EXIT_CODE
-        fi
+        cd MLProject
+        export MLFLOW_ARTIFACT_ROOT=./mlruns
+        mlflow run . --env-manager=local -P data_path="train_preprocessing.csv"
 
-    - name: Upload mlflow run log and mlruns (debug)
-      uses: actions/upload-artifact@v4
-      with:
-        name: mlflow-run-debug
-        path: |
-          mlflow_run.log
-          MLProject/mlruns
-
-    # 5️⃣ Determine latest model artifact
-    - name: Locate latest model artifact (flexible)
+    - name: Get latest MLflow run_id and model path
       run: |
-        set -euo pipefail
-        # 1) Prefer artifact named 'model'
-        MODEL_DIR=$(ls -td MLProject/mlruns/*/*/artifacts/model 2>/dev/null | head -n 1 || true)
-        if [ -z "$MODEL_DIR" ]; then
-          echo "No 'model' artifact folder found. Searching any artifacts..."
-          MODEL_DIR=$(ls -td MLProject/mlruns/*/*/artifacts/* 2>/dev/null | head -n 1 || true)
-        fi
-
-        # 2) If still empty, try to parse mlflow_run.log for a local file:// artifact URI
-        if [ -z "$MODEL_DIR" ] && [ -f mlflow_run.log ]; then
-          echo "Attempting to parse mlflow_run.log for artifact URI..."
-          # Look for first file://... occurrence
-          ART_URI=$(grep -oE 'file://[^) ]+' mlflow_run.log | head -n1 || true)
-          if [ -n "$ART_URI" ]; then
-            # convert file:// URI to path
-            MODEL_DIR=${ART_URI#file://}
-          fi
-        fi
-
-        if [ -z "$MODEL_DIR" ]; then
-          echo "Model artifact not found. Contents of MLProject:/mlruns:";
-          find MLProject/mlruns -maxdepth 3 -mindepth 1 -type d -print || true
-          echo "mlflow_run.log (tail):"; tail -n 200 mlflow_run.log || true
+        cd MLProject
+        RUN_ID=$(ls -t mlruns/0 2>/dev/null | grep -E '^[a-f0-9]{32}$' | head -n 1 || true)
+        if [ -z "$RUN_ID" ]; then
+          echo "No MLflow runs found!" 
+          ls -la mlruns || true
           exit 1
         fi
+        echo "RUN_ID=$RUN_ID" >> $GITHUB_ENV
+        MODEL_PATH="mlruns/0/$RUN_ID/artifacts/model"
+        if [ ! -d "$MODEL_PATH" ]; then
+          echo "Model not found at $MODEL_PATH!"
+          ls -la mlruns/0/$RUN_ID/artifacts/ || true
+          exit 1
+        fi
+        echo "MODEL_PATH=$MODEL_PATH" >> $GITHUB_ENV
+        ABS_MODEL_PATH="$GITHUB_WORKSPACE/MLProject/$MODEL_PATH"
+        echo "ABS_MODEL_PATH=$ABS_MODEL_PATH" >> $GITHUB_ENV
+        echo "Model artifact absolute path: $ABS_MODEL_PATH"
 
-        echo "Using MODEL_DIR: $MODEL_DIR"
-        echo "MODEL_DIR=$MODEL_DIR" >> $GITHUB_ENV
-
-    # 5️⃣ Upload MLflow artifacts
     - name: Upload Model Artifact
       uses: actions/upload-artifact@v4
       with:
