@@ -16,7 +16,7 @@ from pathlib import Path
 # 0. PARSE ARGUMENTS
 # ==============================================
 data_path = sys.argv[1] if len(sys.argv) > 1 else "train_preprocessing.csv"
-target_var = sys.argv[2] if len(sys.argv) > 2 else "PlacementStatus"
+target_var = sys.argv[2] if len(sys.argv) > 2 else "y"
 
 print(f"Loading data from: {data_path}")
 print(f"Target variable: {target_var}")
