@@ -78,25 +78,27 @@ jobs:
           echo "MODEL_PATH=$ABS_MODEL_PATH" >> $GITHUB_ENV
           echo "Absolute model path: $ABS_MODEL_PATH"
 
-      - name: Build Docker Model (Optional - commented out due to Java dependency issues)
-        
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+
+      - name: Build Docker Model
         run: |
           mlflow models build-docker --model-uri "file://$MODEL_PATH" --name "cc"
 
       - name: Log in to Docker Hub (Optional)
-         
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Tag Docker Image (Optional)
-          
         run: |
           docker tag cc ${{ secrets.DOCKERHUB_USERNAME }}/cc:latest
 
       - name: Push Docker Image (Optional)
-        
         run: |
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/cc:latest
       
